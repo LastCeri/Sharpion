@@ -1,16 +1,57 @@
 # Sharpion
 
-**Sharpion** is an innovative project developed in C#, enabling the integration of web3 games operating over Websocket into game engines. This project allows users to connect to their games directly from websites without using an in-game web browser, and to interact with blockchain transactions (transactions, queries), and smart contracts.
+**Sharpion** is a C# library for integrating web3 games that use WebSocket into game engines. It lets users connect to games from websites without an in-game browser and interact with blockchain transactions and smart contracts.
 
 ### Key Features
 
-- **Websocket-based Communication**: Fast and secure communication based on Websocket.
-- **Direct Integration with Game Engines**: Ensures seamless integration.
-- **User-Friendly Interface**: Easy access through a user-friendly interface.
-- **Blockchain Interaction**: Interaction with smart contracts and blockchain query operations.
-- **Flexible Compatibility**: Compatible with various web3 games and game engines.
-- **User Authentication**: Secure user identity authentication.
-- **Low Latency**: Low latency in-game operations thanks to Websocket technology.
-- **Blockchain Technology Integration**: Full support for smart contracts and blockchain operations.
-- **Developer-Friendly APIs**: Easy-to-use APIs for game integration and customization.
-- **Security-Focused Design**: Industry-standard encryption and security protocols.
+- **WebSocket communication**: Fast, low-latency client–server protocol.
+- **Platform abstraction**: .NET implementation included; Unity and other platforms can be added via `IIonPlatform`.
+- **Blockchain operations**: Wallet connect, balance queries, and transaction sending.
+- **Configurable**: Connection endpoint and TLS via `SharpionOptions`.
+- **Testable design**: Interfaces (`IIonPlatform`, `IClientSession`) and dependency-friendly APIs.
+
+### Build
+
+```bash
+cd Sharpion
+dotnet build
+```
+
+Target: .NET Standard 2.0. Dependencies: Newtonsoft.Json; WebSocket implementation is bundled under `Library/websocket-sharp`.
+
+### Usage
+
+```csharp
+using Sharpion;
+using Sharpion.Configuration;
+using Sharpion.Operations.SendTransaction;
+using Sharpion.Platforms;
+
+var options = new SharpionOptions
+{
+    WebSocketEndpoint = "localhost:8080",
+    UseSecureConnection = false
+};
+
+var manager = SharpionManager.Create(PlatformName.Dotnet, options);
+manager.ConnectToServer();
+manager.ConnectWallet();
+manager.BalanceOf("0x...");
+manager.SendTransaction(new TransactionInteraction
+{
+    ReceiptAddress = "0x...",
+    ContractAddress = "0x...",
+    Amount = "0.1"
+});
+manager.DisconnectWallet();
+manager.DisconnectFromServer();
+```
+
+### Architecture
+
+- **Sharpion**: Entry facade (`SharpionManager`) and configuration (`SharpionOptions`).
+- **Sharpion.Platforms**: Platform abstraction (`IIonPlatform`, `IonPlatformBase`) and `PlatformName`.
+- **Sharpion.Platforms.Dotnet**: .NET implementation using `SharpionClient` (WebSocket).
+- **Sharpion.Platforms.Dotnet.Client.Handlers**: Packet types (`ClientPacketType`), DTOs (`Packs`), and message handling (`PacketHandler`).
+- **Sharpion.Operations.SendTransaction**: DTO for transactions (`TransactionInteraction`).
+- **Sharpion.Configuration**: Options for connection (`SharpionOptions`).

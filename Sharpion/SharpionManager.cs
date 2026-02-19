@@ -1,35 +1,45 @@
-using Sharpion.IonUtils.PacksOps.SendTransaction;
-using Sharpion.Manager.IonPlatforms;
-using Sharpion.Manager.IonPlatforms.Dotnet;
 using System;
-using static Sharpion.Manager.IonPlatforms.IonPlatform;
+using Sharpion.Configuration;
+using Sharpion.Operations.SendTransaction;
+using Sharpion.Platforms;
+using Sharpion.Platforms.Dotnet;
 
-namespace Sharpion.Manager
+namespace Sharpion
 {
+    /// <summary>
+    /// Entry point and facade for Sharpion: creates a platform-specific client and exposes connection and wallet operations.
+    /// </summary>
     public class SharpionManager
     {
-        IonPlatform IonPlatform;
-        public SharpionManager(IonPlatform platform) {this.IonPlatform = platform;}
-        public static SharpionManager New(PlatformName name)
-        {
-            IonPlatform platform;
-            switch (name)
-            {
-                case PlatformName.Dotnet:
-                    platform = new IonDotnet();
-                    break;
-                default:
-                    throw new NotSupportedException($"Platform '{name}' is not supported.");
-            }
+        private readonly IIonPlatform _platform;
 
+        public SharpionManager(IIonPlatform platform)
+        {
+            _platform = platform ?? throw new ArgumentNullException(nameof(platform));
+        }
+
+        /// <summary>
+        /// Creates a Sharpion manager for the given platform with the provided options.
+        /// </summary>
+        public static SharpionManager Create(PlatformName platformName, SharpionOptions options)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            IIonPlatform platform = platformName switch
+            {
+                PlatformName.Dotnet => new IonDotnet(options),
+                _ => throw new NotSupportedException($"Platform '{platformName}' is not supported.")
+            };
             return new SharpionManager(platform);
         }
-        public virtual void ConnectToServer() { IonPlatform.ConnectToServer(); }
-        public virtual void DisconnectToServer() { IonPlatform.DisconnectToServer(); }
-        public virtual bool ServerConnectionStatus() { return IonPlatform.ServerConnectionStatus(); }
-        public virtual void ConnectWallet() { IonPlatform.ConnectWallet(); }
-        public virtual void DisconnectWallet() { IonPlatform.DisconnectWallet(); }
-        public virtual void BalanceOf(string walletadress) { IonPlatform.BalanceOf(walletadress); }
-        public virtual void SendTransaction(TransactionInteraction transactionInteraction) { IonPlatform.SendTransaction(transactionInteraction); }
+
+        public virtual void ConnectToServer() => _platform.ConnectToServer();
+        public virtual void DisconnectFromServer() => _platform.DisconnectFromServer();
+        public virtual bool IsServerConnected() => _platform.IsServerConnected();
+        public virtual void ConnectWallet() => _platform.ConnectWallet();
+        public virtual void DisconnectWallet() => _platform.DisconnectWallet();
+        public virtual void BalanceOf(string walletAddress) => _platform.BalanceOf(walletAddress);
+        public virtual void SendTransaction(TransactionInteraction transaction) => _platform.SendTransaction(transaction);
     }
 }
