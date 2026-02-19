@@ -1,18 +1,41 @@
-﻿
-using Sharpion.IonUtils.PacksOps.SendTransaction;
+using Sharpion.Operations.SendTransaction;
 
-namespace Sharpion.Manager.IonPlatforms
+namespace Sharpion.Platforms
 {
-    public class IonPlatform
+    /// <summary>
+    /// Supported platform targets for Sharpion.
+    /// </summary>
+    public enum PlatformName
     {
-        public enum PlatformName { Unity, Dotnet }
+        Unity,
+        Dotnet
+    }
+
+    /// <summary>
+    /// Abstraction for platform-specific WebSocket and wallet operations.
+    /// </summary>
+    public interface IIonPlatform
+    {
+        void ConnectToServer();
+        void DisconnectFromServer();
+        bool IsServerConnected();
+        void ConnectWallet();
+        void DisconnectWallet();
+        void BalanceOf(string walletAddress);
+        void SendTransaction(TransactionInteraction transaction);
+    }
+
+    /// <summary>
+    /// Base implementation of <see cref="IIonPlatform"/> with no-op defaults.
+    /// </summary>
+    public abstract class IonPlatformBase : IIonPlatform
+    {
         public virtual void ConnectToServer() { }
-        public virtual void DisconnectToServer() { }
-        public virtual bool ServerConnectionStatus() => false;
+        public virtual void DisconnectFromServer() { }
+        public virtual bool IsServerConnected() => false;
         public virtual void ConnectWallet() { }
         public virtual void DisconnectWallet() { }
-        public virtual void BalanceOf(string walletadress) { }
-        public virtual void SendTransaction(TransactionInteraction transactionInteraction) { }
-
+        public virtual void BalanceOf(string walletAddress) { }
+        public virtual void SendTransaction(TransactionInteraction transaction) { }
     }
 }

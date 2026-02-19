@@ -1,72 +1,93 @@
-﻿using System;
-
-using WebSocketSharp;
-
+using System;
 using System.Text;
 using Newtonsoft.Json;
-using Sharpion.Dotnet.Handlers;
-using Sharpion.IonUtils.PacksOps.SendTransaction;
+using WebSocketSharp;
+using Sharpion.Configuration;
+using Sharpion.Operations.SendTransaction;
+using Sharpion.Platforms.Dotnet.Client.Handlers;
 
-namespace Sharpion.Dotnet
+namespace Sharpion.Platforms.Dotnet.Client
 {
-    public class Client
+    /// <summary>
+    /// WebSocket client for the Sharpion protocol. Implements session state for wallet and balance.
+    /// </summary>
+    public sealed class SharpionClient : IClientSession
     {
-        public static Client instance;
-        public static WebSocket ws;
+        private WebSocket? _webSocket;
+        private readonly SharpionOptions _options;
 
-        public static int SocketClientID;
-        public string UserWalletAddress;
-        public string UserBalanceOfEth;
-
-        public void ConnectToServer() {
-
-            ws = new WebSocket($"ws://{Settings.Settings.webSocketipandport}");
-            ws.OnMessage += async (sender, e) => await Handler.HandShake(e.Data);
-            ws.OnOpen += (sender, e) => Console.WriteLine("WebSocket Connection Open.");
-            ws.OnClose += (sender, e) => Console.WriteLine("WebSocket Connection Close.");
-            ws.OnError += (sender, e) => Console.WriteLine($"WebSocket Connection Error: {e.Message}");
-            ws.Connect();
+        public SharpionClient(SharpionOptions options)
+        {
+            _options = options ?? throw new ArgumentNullException(nameof(options));
+            if (string.IsNullOrWhiteSpace(_options.WebSocketEndpoint))
+                throw new ArgumentException("WebSocketEndpoint is required.", nameof(options));
         }
+
+        public static int SocketClientId { get; set; }
+        public string? UserWalletAddress { get; private set; }
+        public string? UserBalanceOfEth { get; private set; }
+
+        public void ConnectToServer()
+        {
+            var scheme = _options.UseSecureConnection ? "wss" : "ws";
+            var url = $"{scheme}://{_options.WebSocketEndpoint}";
+            _webSocket = new WebSocket(url);
+            _webSocket.OnMessage += async (_, e) => await PacketHandler.HandleHandshakeAsync(e.Data);
+            _webSocket.OnOpen += (_, __) => Console.WriteLine("WebSocket connection open.");
+            _webSocket.OnClose += (_, __) => Console.WriteLine("WebSocket connection closed.");
+            _webSocket.OnError += (_, e) => Console.WriteLine($"WebSocket error: {e.Message}");
+
+            PacketHandler.GetCurrentSession = () => this;
+            _webSocket.Connect();
+        }
+
         public void DisconnectFromServer()
         {
-            if (ws != null && ws.ReadyState == WebSocketState.Open)
+            if (_webSocket?.ReadyState == WebSocketState.Open)
             {
-                ws.Close();
-                Console.WriteLine("The WebSocket connection was closed manually.");
+                _webSocket.Close();
+                Console.WriteLine("WebSocket connection closed manually.");
             }
         }
-        public bool IsSocketAlive() => ws?.IsAlive ?? false;
-        public void ConnectWallet() => instance.SendDataFromJson(JsonConvert.SerializeObject(Packs.CreateLoginPack(false, false)));
-        public void DisconnectWallet() => instance.SendDataFromJson(JsonConvert.SerializeObject(Packs.CreateDisconnectPack(SocketClientID, false, false)));
-        public void BalanceOfWallet(string WalletAdress) => instance.SendDataFromJson(JsonConvert.SerializeObject(Packs.CreateBalanceOfPack(SocketClientID, WalletAdress)));
-        public void SendTransaction(TransactionInteraction transactionInteraction) => instance.SendDataFromJson(JsonConvert.SerializeObject(Packs.CreateTransactionPack(SocketClientID, transactionInteraction)));
 
-        public void SendDataFromJson(string sendjson)
+        public bool IsSocketAlive() => _webSocket?.IsAlive ?? false;
+
+        public void ConnectWallet() =>
+            SendJson(JsonConvert.SerializeObject(Packs.CreateLoginPack(false, false)));
+
+        public void DisconnectWallet() =>
+            SendJson(JsonConvert.SerializeObject(Packs.CreateDisconnectPack(SocketClientId, false, false)));
+
+        public void BalanceOfWallet(string walletAddress) =>
+            SendJson(JsonConvert.SerializeObject(Packs.CreateBalanceOfPack(SocketClientId, walletAddress)));
+
+        public void SendTransaction(TransactionInteraction interaction) =>
+            SendJson(JsonConvert.SerializeObject(Packs.CreateTransactionPack(SocketClientId, interaction)));
+
+        public void SetUserWalletAddress(string address) => UserWalletAddress = address;
+        public void SetUserBalanceOfEth(string balance) => UserBalanceOfEth = balance;
+
+        private void SendJson(string json)
         {
             try
             {
-                // This line checks if the given string is in valid JSON format.
-                JsonConvert.DeserializeObject(sendjson);
+                JsonConvert.DeserializeObject(json);
             }
-            catch (JsonReaderException jex)
+            catch (JsonReaderException ex)
             {
-                // If an error occurs, it means the string is not in JSON format.
-                Console.WriteLine("The provided string is not in a valid JSON format.");
-                Console.WriteLine(jex.Message); // Prints the specific error message.
-                return; // Exits the method.
+                Console.WriteLine("Invalid JSON format.");
+                Console.WriteLine(ex.Message);
+                return;
             }
+
             try
             {
-                if (ws.ReadyState == WebSocketState.Open)
-                {
-                    byte[] dataToSend = Encoding.UTF8.GetBytes(sendjson);
-                    ws.Send(dataToSend);
-                }
+                if (_webSocket?.ReadyState == WebSocketState.Open)
+                    _webSocket.Send(Encoding.UTF8.GetBytes(json));
             }
-            catch (Exception ex) // General exception for any WebSocket related error.
+            catch (Exception ex)
             {
-                Console.WriteLine("Error occurred while sending data.");
-                Console.WriteLine(ex.Message);
+                Console.WriteLine($"Error sending data: {ex.Message}");
             }
         }
     }

@@ -1,17 +1,27 @@
-using Sharpion.Dotnet;
-using Sharpion.IonUtils.PacksOps.SendTransaction;
+using Sharpion.Configuration;
+using Sharpion.Operations.SendTransaction;
+using Sharpion.Platforms.Dotnet.Client;
 
-namespace Sharpion.Manager.IonPlatforms.Dotnet
+namespace Sharpion.Platforms.Dotnet
 {
-    public class IonDotnet : IonPlatform
+    /// <summary>
+    /// .NET platform implementation using WebSocket client.
+    /// </summary>
+    public sealed class IonDotnet : IonPlatformBase
     {
-        public static Client socket;
-        public override void ConnectToServer() { Client.instance.ConnectToServer(); socket = Client.instance; }
-        public override void DisconnectToServer() =>  socket.DisconnectFromServer();
-        public override void ConnectWallet() => socket.ConnectWallet();
-        public override void DisconnectWallet() => socket.DisconnectWallet(); 
-        public override bool ServerConnectionStatus() =>  socket.IsSocketAlive();
-        public override void BalanceOf(string walletadress) => socket.BalanceOfWallet(walletadress);
-        public override void SendTransaction(TransactionInteraction transactionInteraction) => socket.SendTransaction(transactionInteraction);
+        private readonly SharpionClient _client;
+
+        public IonDotnet(SharpionOptions options)
+        {
+            _client = new SharpionClient(options ?? throw new System.ArgumentNullException(nameof(options)));
+        }
+
+        public override void ConnectToServer() => _client.ConnectToServer();
+        public override void DisconnectFromServer() => _client.DisconnectFromServer();
+        public override bool IsServerConnected() => _client.IsSocketAlive();
+        public override void ConnectWallet() => _client.ConnectWallet();
+        public override void DisconnectWallet() => _client.DisconnectWallet();
+        public override void BalanceOf(string walletAddress) => _client.BalanceOfWallet(walletAddress);
+        public override void SendTransaction(TransactionInteraction transaction) => _client.SendTransaction(transaction);
     }
 }

@@ -1,153 +1,132 @@
 using System;
-using Newtonsoft.Json;
 using System.Threading.Tasks;
-using static Sharpion.Dotnet.Handlers.Enum;
-using static Sharpion.Dotnet.Handlers.Packs;
-using Sharpion.Dotnet;
+using Newtonsoft.Json;
+using static Sharpion.Platforms.Dotnet.Client.Handlers.ClientPacketType;
+using static Sharpion.Platforms.Dotnet.Client.Handlers.Packs;
 
-namespace Sharpion.Dotnet.Handlers
+namespace Sharpion.Platforms.Dotnet.Client.Handlers
 {
-    public class Handler
+    /// <summary>
+    /// Handles incoming WebSocket messages and dispatches to packet-specific handlers.
+    /// </summary>
+    public static class PacketHandler
     {
+        /// <summary>
+        /// Callback used to resolve the current client instance for handler updates (e.g. wallet address).
+        /// Set by the client when it registers itself.
+        /// </summary>
+        internal static Func<IClientSession> GetCurrentSession { get; set; }
 
-        public static async Task HandShake(string datahandjson)
+        public static async Task HandleHandshakeAsync(string messageJson)
         {
             try
             {
-                Console.WriteLine("Data From Server (HandShake): " + datahandjson);
+                var packet = JsonConvert.DeserializeObject<Packet>(messageJson);
+                if (packet == null) return;
 
-                Packet handshakepacket = JsonConvert.DeserializeObject<Packet>(datahandjson);
-
-                switch (handshakepacket.type)
+                switch (packet.Type)
                 {
-                    case (int)ClientEnum.Login:
-                        await HandleLoginPacketAsync(JsonConvert.DeserializeObject<LoginPacket>(datahandjson));
+                    case (int)ClientPacketType.Login:
+                        await HandleLoginPacketAsync(JsonConvert.DeserializeObject<LoginPacket>(messageJson));
                         break;
-                    case (int)ClientEnum.WalletPack:
-                        await HandleConnectionPacketAsync(JsonConvert.DeserializeObject<ConnectionWalletPack>(datahandjson));
+                    case (int)ClientPacketType.WalletPack:
+                        await HandleConnectionPacketAsync(JsonConvert.DeserializeObject<ConnectionWalletPack>(messageJson));
                         break;
-                    case (int)ClientEnum.Balance:
-                        await HandleBalancePacketAsync(JsonConvert.DeserializeObject<BalancePacket>(datahandjson));
+                    case (int)ClientPacketType.Balance:
+                        await HandleBalancePacketAsync(JsonConvert.DeserializeObject<BalancePacket>(messageJson));
                         break;
-                    case (int)ClientEnum.Transaction:
-                        await HandleTransactionPacketAsync(JsonConvert.DeserializeObject<TransactionPacket>(datahandjson));
-                        break;
-                    default:
+                    case (int)ClientPacketType.Transaction:
+                        await HandleTransactionPacketAsync(JsonConvert.DeserializeObject<TransactionPacket>(messageJson));
                         break;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error in HandShake: " + ex.Message);
+                Console.WriteLine($"Error in Handshake: {ex.Message}");
             }
+
+            await Task.CompletedTask;
         }
 
-        public static async Task HandleLoginPacketAsync(LoginPacket loginPacket)
+        private static async Task HandleLoginPacketAsync(LoginPacket loginPacket)
         {
-            // Check for null packets to avoid NullReferenceException.
-            if (loginPacket == null)
-            {
-                Console.WriteLine("Received a null login packet in HandleLoginPacketAsync.");
-                return;
-            }
+            if (loginPacket == null) return;
             try
             {
-                // Check if user is logged in.
-                if (loginPacket.islog)
-                {
-                    Console.WriteLine($"Login Data From Server: {loginPacket.message}");
-                    // Additional logic for logged-in user can be placed here.
-                }
-                // Check if user is authenticated (e.g., connected their wallet).
-                else if (loginPacket.auth)
-                {
-                    Console.WriteLine($"Login Data From Server (User Connected Wallet): {loginPacket.message}");
-                    // Additional logic for authenticated user can be placed here.
-                }
-                // Handle other cases.
+                if (loginPacket.IsLoggedIn)
+                    Console.WriteLine($"Login Data From Server: {loginPacket.Message}");
+                else if (loginPacket.Auth)
+                    Console.WriteLine($"Login Data From Server (User Connected Wallet): {loginPacket.Message}");
                 else
-                {
-                    Console.WriteLine($"Login Data From Server: {loginPacket.message}");
-                    return;
-                }
+                    Console.WriteLine($"Login Data From Server: {loginPacket.Message}");
             }
-            // Catch any unexpected errors during processing.
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing the login packet in HandleLoginPacketAsync: {ex.Message}");
+                Console.WriteLine($"Error processing login packet: {ex.Message}");
             }
+            await Task.CompletedTask;
         }
-        public static async Task HandleConnectionPacketAsync(ConnectionWalletPack connectionPacket)
+
+        private static async Task HandleConnectionPacketAsync(ConnectionWalletPack connectionPacket)
         {
-            // Safeguard against null packets to prevent potential NullReferenceException.
-            if (connectionPacket == null)
-            {
-                Console.WriteLine("Received a null connection packet in HandleConnectionPacketAsync.");
-                return;
-            }
+            if (connectionPacket == null) return;
             try
             {
-                // If a public wallet address is provided, process it.
                 if (!string.IsNullOrEmpty(connectionPacket.PublicWallet))
                 {
                     Console.WriteLine($"Player Wallet Address: {connectionPacket.PublicWallet}");
-
-                    // Update the user's wallet address in the Socket instance.
-                    Client.instance.UserWalletAddress = connectionPacket.PublicWallet;
+                    var session = GetCurrentSession?.Invoke();
+                    session?.SetUserWalletAddress(connectionPacket.PublicWallet);
                 }
             }
-            // Catch any unexpected errors during packet processing.
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing the connection packet in HandleConnectionPacketAsync: {ex.Message}");
+                Console.WriteLine($"Error processing connection packet: {ex.Message}");
             }
+            await Task.CompletedTask;
         }
-        public static async Task HandleBalancePacketAsync(BalancePacket balancePacket)
+
+        private static async Task HandleBalancePacketAsync(BalancePacket balancePacket)
         {
-            // Safeguard against null packets to prevent potential NullReferenceException.
-            if (balancePacket == null)
-            {
-                Console.WriteLine("Received a null balance packet in HandleBalancePacketAsync.");
-                return;
-            }
+            if (balancePacket == null) return;
             try
             {
-                // If an Ethereum balance is provided, process it.
                 if (!string.IsNullOrEmpty(balancePacket.BalanceOfEth))
                 {
                     Console.WriteLine($"Player's Ethereum Balance: {balancePacket.BalanceOfEth}");
-                    // Update the user's Ethereum balance in the Socket instance.
-                    Client.instance.UserBalanceOfEth = balancePacket.BalanceOfEth;
+                    var session = GetCurrentSession?.Invoke();
+                    session?.SetUserBalanceOfEth(balancePacket.BalanceOfEth);
                 }
             }
-            // Catch any unexpected errors during packet processing.
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing the balance packet in HandleBalancePacketAsync: {ex.Message}");
+                Console.WriteLine($"Error processing balance packet: {ex.Message}");
             }
-        }
-        public static async Task HandleTransactionPacketAsync(TransactionPacket transactionPacket)
-        {
-            // Safeguard against null packets to prevent potential NullReferenceException.
-            if (transactionPacket == null)
-            {
-                Console.WriteLine("Received a null transaction packet in HandleTransactionPacketAsync.");
-                return;
-            }
-            try
-            {
-                // If a transaction status message is provided, log it.
-                if (!string.IsNullOrEmpty(transactionPacket.TransactionStatusMessage))
-                {
-                    Console.WriteLine($"Player Transaction Status: {transactionPacket.TransactionStatusMessage}");
-                }
-            }
-            // Catch any unexpected errors during packet processing.
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error processing the transaction packet in HandleTransactionPacketAsync: {ex.Message}");
-            }
+            await Task.CompletedTask;
         }
 
+        private static async Task HandleTransactionPacketAsync(TransactionPacket transactionPacket)
+        {
+            if (transactionPacket == null) return;
+            try
+            {
+                if (!string.IsNullOrEmpty(transactionPacket.TransactionStatusMessage))
+                    Console.WriteLine($"Player Transaction Status: {transactionPacket.TransactionStatusMessage}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing transaction packet: {ex.Message}");
+            }
+            await Task.CompletedTask;
+        }
+    }
+
+    /// <summary>
+    /// Session state updated by packet handlers (wallet address, balance).
+    /// </summary>
+    public interface IClientSession
+    {
+        void SetUserWalletAddress(string address);
+        void SetUserBalanceOfEth(string balance);
     }
 }

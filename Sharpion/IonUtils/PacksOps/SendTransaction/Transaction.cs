@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Sharpion.IonUtils.PacksOps.SendTransaction
+namespace Sharpion.Operations.SendTransaction
 {
+    /// <summary>
+    /// DTO for sending a blockchain transaction (contract call or transfer).
+    /// </summary>
     public class TransactionInteraction
     {
-        public string ReceiptAddress { get; set; }
-        public string ContractAddress { get; set; }
-        public string Amount { get; set; }
+        public string? ReceiptAddress { get; set; }
+        public string? ContractAddress { get; set; }
+        public string? Amount { get; set; }
     }
 }
